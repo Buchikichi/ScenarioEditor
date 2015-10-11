@@ -30,7 +30,7 @@ public abstract class EditorFrame extends JFrame {
 	protected JScrollPane scrollPane = new JScrollPane(this.mapPane);
 
 	protected abstract void open();
-	protected abstract void save(MapPanel mapPane);
+	protected abstract void save();
 
 	/**
 	 * Create the frame.
@@ -63,7 +63,7 @@ public abstract class EditorFrame extends JFrame {
 		JButton btnSave = new JButton("Save");
 		btnSave.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
-				save(EditorFrame.this.mapPane);
+				save();
 			}
 		});
 		btnSave.setSize(40, 20);

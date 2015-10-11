@@ -3,13 +3,14 @@ package to.kit.scenario.edit;
 import java.awt.EventQueue;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 
 import javax.imageio.ImageIO;
 import javax.swing.JFileChooser;
 import javax.swing.filechooser.FileFilter;
 
-import to.kit.scenario.edit.component.MapPanel;
+import net.arnx.jsonic.JSON;
 
 /**
  * エディターメイン.
@@ -21,8 +22,8 @@ public class ScenarioEditorMain extends EditorFrame {
 	private JFileChooser chooser = new JFileChooser();
 
 	@Override
-	protected void save(MapPanel mapPane) {
-		BufferedImage bgImage = mapPane.getBgImage();
+	protected void save() {
+		BufferedImage bgImage = this.mapPane.getBgImage();
 
 		if (bgImage == null) {
 			return;
@@ -35,13 +36,20 @@ public class ScenarioEditorMain extends EditorFrame {
 		String filename = file.getAbsolutePath();
 		String bgName = filename.replaceAll(FILE_EXT, "bg.png");
 		String stName = filename.replaceAll(FILE_EXT, "st.png");
-		BufferedImage stImage = mapPane.getStairImage();
+		BufferedImage stImage = this.mapPane.getStairImage();
 
 		try {
 			ImageIO.write(bgImage, "png", new File(bgName));
 			ImageIO.write(stImage, "png", new File(stName));
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		String wallName = filename.replaceAll(FILE_EXT, ".wal");
+		String wallData = JSON.encode(this.mapPane.getWallData());
+
+		try (FileWriter out = new FileWriter(new File(wallName))) {
+			out.write(wallData);
+		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}

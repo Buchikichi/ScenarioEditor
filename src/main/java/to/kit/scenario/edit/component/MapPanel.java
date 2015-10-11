@@ -83,9 +83,10 @@ public final class MapPanel extends JPanel implements ActionListener {
 					stg.drawImage(stBrick, bx, by, null);
 				}
 				if (this.isShowWall && 0x7f < bgData) {
+					int num = bgData & 0x7f;
 					int fy = by + 11;
 					int width = BrickChooser.BRICK_WIDTH - 1;
-					String msg = String.format("%02X", Integer.valueOf(bgData));
+					String msg = String.format("%02X", Integer.valueOf(bgData - num));
 					bgg.setColor(Color.BLACK);
 					bgg.drawString(msg, bx, fy + 1);
 					bgg.drawString(msg, bx + 1, fy + 1);
@@ -200,14 +201,36 @@ public final class MapPanel extends JPanel implements ActionListener {
 	}
 
 	/**
-	 * @return the bgImage
+	 * 壁情報を取得.
+	 * @return 壁情報
+	 */
+	public String[][] getWallData() {
+		String[][] result = new String[this.mapSize.height][this.mapSize.width];
+
+		for (int y = 0; y < this.mapSize.height; y++) {
+			int origin = y * this.mapSize.width * 4;
+
+			for (int x = 0; x < this.mapSize.width; x++) {
+				int ix = origin + x * 4;
+				int bgData = this.mapData[ix] & 0xff;
+
+				result[y][x] = bgData < 0x80 ? "0" : "1";
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * バックグラウンドイメージを取得.
+	 * @return バックグラウンドイメージ
 	 */
 	public BufferedImage getBgImage() {
 		return this.bgImage;
 	}
 
 	/**
-	 * @return the stairImage
+	 * 上層イメージを取得.
+	 * @return 上層イメージ
 	 */
 	public BufferedImage getStairImage() {
 		return this.stairImage;
