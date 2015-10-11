@@ -204,8 +204,8 @@ public final class MapPanel extends JPanel implements ActionListener {
 	 * 壁情報を取得.
 	 * @return 壁情報
 	 */
-	public String[][] getWallData() {
-		String[][] result = new String[this.mapSize.height][this.mapSize.width];
+	public int[][] getWallData() {
+		int[][] result = new int[this.mapSize.height][this.mapSize.width];
 
 		for (int y = 0; y < this.mapSize.height; y++) {
 			int origin = y * this.mapSize.width * 4;
@@ -214,7 +214,7 @@ public final class MapPanel extends JPanel implements ActionListener {
 				int ix = origin + x * 4;
 				int bgData = this.mapData[ix] & 0xff;
 
-				result[y][x] = bgData < 0x80 ? "0" : "1";
+				result[y][x] = bgData < 0x80 ? 0 : 1;
 			}
 		}
 		return result;
