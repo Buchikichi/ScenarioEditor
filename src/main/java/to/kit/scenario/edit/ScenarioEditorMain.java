@@ -44,8 +44,8 @@ public class ScenarioEditorMain extends EditorFrame {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		String wallName = filename.replaceAll(FILE_EXT, ".wal");
-		String wallData = JSON.encode(this.mapPane.getWallData());
+		String wallName = filename.replaceAll(FILE_EXT, ".map");
+		String wallData = JSON.encode(this.mapPane.getMapInfo());
 
 		try (FileWriter out = new FileWriter(new File(wallName))) {
 			out.write(wallData);

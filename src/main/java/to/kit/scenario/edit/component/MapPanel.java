@@ -14,9 +14,14 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 
 import javax.swing.JPanel;
 import javax.swing.Timer;
+
+import to.kit.scenario.edit.info.MapEvent;
+import to.kit.scenario.edit.info.MapInfo;
+import to.kit.scenario.edit.info.Square;
 
 /**
  * マップ表示パネル.
@@ -30,7 +35,7 @@ public final class MapPanel extends JPanel implements ActionListener {
 
 	private ActorPanel actor = new ActorPanel("/chr001.png", 32, 32);
 	private BrickChooser brick;
-	private Dimension mapSize;
+	private MapInfo mapInfo;
 	private Dimension imgSize;
 	private byte[] mapData;
 	private BufferedImage bgImage;
@@ -60,12 +65,13 @@ public final class MapPanel extends JPanel implements ActionListener {
 	private void drawImage() {
 		Graphics2D bgg = (Graphics2D) this.bgImage.getGraphics();
 		Graphics2D stg = (Graphics2D) this.stairImage.getGraphics();
+		Square mapSize = this.mapInfo.getMapSize();
 
-		for (int y = 0; y < this.mapSize.height; y++) {
+		for (int y = 0; y < mapSize.height; y++) {
 			int by = y * BrickChooser.BRICK_WIDTH;
-			int origin = y * this.mapSize.width * 4;
+			int origin = y * mapSize.width * 4;
 
-			for (int x = 0; x < this.mapSize.width; x++) {
+			for (int x = 0; x < mapSize.width; x++) {
 				int bx = x * BrickChooser.BRICK_WIDTH;
 				int ix = origin + x * 4;
 				int bgData = this.mapData[ix] & 0xff;
@@ -126,29 +132,6 @@ public final class MapPanel extends JPanel implements ActionListener {
 		return (short) ((val & 0xff) << 8 | (val >> 8 & 0xff));
 	}
 
-	private void loadHeader(DataInputStream data) throws IOException {
-		short width = swapShort(data.readShort());
-		short height = swapShort(data.readShort());
-		this.mapSize = new Dimension(width, height);
-		short posX = swapShort(data.readShort());
-		short posY = swapShort(data.readShort());
-		short block = swapShort(data.readShort());
-		short object = swapShort(data.readShort());
-
-		this.actor.setX(posX);
-		this.actor.setY(posY);
-		System.out.println("@" + posX + "," + posY);
-		System.out.println("block:" + block);
-		System.out.println("object:" + object);
-		for (int ix = 0; ix < 8; ix++) {
-			short chr = swapShort(data.readUnsignedShort());
-			System.out.println("chr" + ix + ":" + chr);
-		}
-		this.imgSize = new Dimension(this.mapSize.width * BrickChooser.BRICK_WIDTH,
-				this.mapSize.height * BrickChooser.BRICK_WIDTH);
-		setPreferredSize(this.imgSize);
-	}
-
 	/**
 	 * @param file
 	 * @throws IOException
@@ -163,8 +146,26 @@ public final class MapPanel extends JPanel implements ActionListener {
 			if (!"CMAP".equals(sig)) {
 				return;
 			}
-			loadHeader(data);
-			this.mapData = new byte[this.mapSize.width * this.mapSize.height * 4];
+			short width = swapShort(data.readShort());
+			short height = swapShort(data.readShort());
+			short posX = swapShort(data.readShort());
+			short posY = swapShort(data.readShort());
+			short block = swapShort(data.readShort());
+			short object = swapShort(data.readShort());
+
+			this.mapInfo = new MapInfo(width, height, posX, posY);
+			this.actor.setX(posX);
+			this.actor.setY(posY);
+			System.out.println("@" + posX + "," + posY);
+			System.out.println("block:" + block);
+			System.out.println("object:" + object);
+			for (int ix = 0; ix < 8; ix++) {
+				short chr = swapShort(data.readUnsignedShort());
+				System.out.println("chr" + ix + ":" + chr);
+			}
+			this.imgSize = new Dimension(width * BrickChooser.BRICK_WIDTH, height * BrickChooser.BRICK_WIDTH);
+			setPreferredSize(this.imgSize);
+			this.mapData = new byte[width * height * 4];
 			data.read(this.mapData);
 			//System.out.println("available:" + data.available());
 		}
@@ -201,23 +202,32 @@ public final class MapPanel extends JPanel implements ActionListener {
 	}
 
 	/**
-	 * 壁情報を取得.
-	 * @return 壁情報
+	 * マップ情報を取得.
+	 * @return マップ情報
 	 */
-	public int[][] getWallData() {
-		int[][] result = new int[this.mapSize.height][this.mapSize.width];
+	public MapInfo getMapInfo() {
+		Square mapSize = this.mapInfo.getMapSize();
+		int[][] wall = new int[mapSize.height][mapSize.width];
+		List<MapEvent> eventList = this.mapInfo.getEventList();
 
-		for (int y = 0; y < this.mapSize.height; y++) {
-			int origin = y * this.mapSize.width * 4;
+		for (int y = 0; y < mapSize.height; y++) {
+			int origin = y * mapSize.width * 4;
 
-			for (int x = 0; x < this.mapSize.width; x++) {
+			for (int x = 0; x < mapSize.width; x++) {
 				int ix = origin + x * 4;
 				int bgData = this.mapData[ix] & 0xff;
+				byte ev = this.mapData[ix + 2];
 
-				result[y][x] = bgData < 0x80 ? 0 : 1;
+				wall[y][x] = bgData < 0x80 ? 0 : 1;
+				if (0 < ev) {
+					String position = x + "-" + y;
+					MapEvent event = new MapEvent(position, ev);
+					eventList.add(event);
+				}
 			}
 		}
-		return result;
+		this.mapInfo.setWall(wall);
+		return this.mapInfo;
 	}
 
 	/**
