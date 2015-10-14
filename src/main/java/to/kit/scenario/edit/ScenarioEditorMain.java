@@ -8,9 +8,9 @@ import java.io.IOException;
 
 import javax.imageio.ImageIO;
 import javax.swing.JFileChooser;
-import javax.swing.filechooser.FileFilter;
 
 import net.arnx.jsonic.JSON;
+import to.kit.scenario.edit.io.ScenarioFile;
 
 /**
  * エディターメイン.
@@ -20,6 +20,21 @@ public class ScenarioEditorMain extends EditorFrame {
 	private static final String FILE_EXT = ".dat";
 
 	private JFileChooser chooser = new JFileChooser();
+	private ScenarioFile scenario = new ScenarioFile();
+
+	private void listMapFiles() {
+		File dir = this.chooser.getCurrentDirectory();
+
+		this.listBox.removeAllItems();
+		for (File file : dir.listFiles()) {
+			String name = file.getName();
+
+			if (!name.endsWith(".dat")) {
+				continue;
+			}
+			this.listBox.addItem(name);
+		}
+	}
 
 	@Override
 	protected void save() {
@@ -61,7 +76,12 @@ public class ScenarioEditorMain extends EditorFrame {
 		if (res != JFileChooser.APPROVE_OPTION) {
 			return;
 		}
-		File file = this.chooser.getSelectedFile();
+	}
+
+	@Override
+	protected void mapChanged(String name) {
+		File dir = this.chooser.getCurrentDirectory();
+		File file = new File(dir, name);
 		String filename = file.getAbsolutePath();
 
 		filename = filename.replaceAll(FILE_EXT, ".png");
@@ -86,19 +106,19 @@ public class ScenarioEditorMain extends EditorFrame {
 	 * @param currentDirectory デフォルト選択ディレクトリ
 	 */
 	public ScenarioEditorMain(String currentDirectory) {
-		this.chooser.setFileFilter(new FileFilter(){
-			@Override
-			public String getDescription() {
-				return "Map.";
-			}
-			@Override
-			public boolean accept(File f) {
-				return f.getName().endsWith(FILE_EXT);
-			}
-		});
-		if (currentDirectory != null) {
-			this.chooser.setCurrentDirectory(new File(currentDirectory));
+		this.chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+		if (currentDirectory == null) {
+			return;
 		}
+		File dir = new File(currentDirectory);
+		if (!dir.exists() || !dir.isDirectory()) {
+			return;
+		}
+		this.chooser.setCurrentDirectory(dir);
+		listMapFiles();
+		File scenarioFile = new File(dir, "scene.xml");
+
+		this.scenario.load(scenarioFile);
 	}
 
 	/**

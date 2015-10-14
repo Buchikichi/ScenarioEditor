@@ -2,22 +2,26 @@ package to.kit.scenario.edit;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.ItemEvent;
+import java.awt.event.ItemListener;
 
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
+import javax.swing.JToggleButton;
 import javax.swing.JToolBar;
 
 import to.kit.scenario.edit.component.BrickChooser;
 import to.kit.scenario.edit.component.MapPanel;
-import javax.swing.JToggleButton;
 
 /**
  * エディター.
@@ -25,12 +29,14 @@ import javax.swing.JToggleButton;
  */
 public abstract class EditorFrame extends JFrame {
 	private static final String ICON_NAME = "/b16au.png";
+	protected JComboBox<String> listBox = new JComboBox<>();
 	protected BrickChooser bricks = new BrickChooser();
 	protected MapPanel mapPane = new MapPanel(this.bricks);
 	protected JScrollPane scrollPane = new JScrollPane(this.mapPane);
 
 	protected abstract void open();
 	protected abstract void save();
+	protected abstract void mapChanged(String name);
 
 	/**
 	 * Create the frame.
@@ -100,15 +106,27 @@ public abstract class EditorFrame extends JFrame {
 			}
 		});
 		toolBar.add(showEventButton);
-		
+
 		JSplitPane splitPane = new JSplitPane();
 		contentPane.add(splitPane, BorderLayout.CENTER);
-		
-		splitPane.setLeftComponent(this.bricks);
 
 		this.scrollPane.setWheelScrollingEnabled(true);
 		JScrollBar verticalScrollBar = this.scrollPane.getVerticalScrollBar();
 		verticalScrollBar.setUnitIncrement(16);
 		splitPane.setRightComponent(this.scrollPane);
+
+		JSplitPane mapSelectionSplitPane = new JSplitPane();
+		mapSelectionSplitPane.setOrientation(JSplitPane.VERTICAL_SPLIT);
+		splitPane.setLeftComponent(mapSelectionSplitPane);
+		this.listBox.addItemListener(new ItemListener() {
+			public void itemStateChanged(ItemEvent e) {
+				if (e.getStateChange() == ItemEvent.SELECTED) {
+					mapChanged(String.valueOf(e.getItem()));
+				}
+			}
+		});
+		this.listBox.setPreferredSize(new Dimension(128, 32));
+		mapSelectionSplitPane.setLeftComponent(this.listBox);
+		mapSelectionSplitPane.setRightComponent(this.bricks);
 	}
 }
