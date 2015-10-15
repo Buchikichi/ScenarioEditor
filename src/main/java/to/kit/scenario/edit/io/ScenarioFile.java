@@ -4,6 +4,12 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.StringReader;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -13,12 +19,65 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.xerces.util.DOMUtil;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
+/**
+ * シナリオファイルロード.
+ * @author Hidetaka Sasai
+ */
 public class ScenarioFile {
+	private static final String FUNC_PREFIX = "mng.";
+	private static final String VARIABLE_PATTERN = "@[$*a-zA-Z0-9]+[ ]*";
+	private Pattern variablePattern = Pattern.compile(VARIABLE_PATTERN);
+	private Map<String, String> choiceMap = new HashMap<>();
+	private Map<String, String> charaMap = new HashMap<>();
+	private Map<String, String> placeMap = new HashMap<>();
+	private Map<String, String> eventMap = new HashMap<>();
+	private Map<Integer, String> eventNumberMap = new HashMap<>();
+
+	private String span(final String styleClass, final String text) {
+		return "<span class=\"" + styleClass + "\">" + text + "</span>";
+	}
+
+	private String convertVariables(final String str) {
+		String result = str;
+		Matcher matcher = this.variablePattern.matcher(str);
+		Set<String> variables = new HashSet<>();
+
+		while (matcher.find()) {
+			variables.add(matcher.group());
+		}
+		for (String var : variables) {
+			String key = var.substring(1);
+			String value;
+
+			if ("Save".equals(key)) {
+				value = StringUtils.chop(makeFunction(0, "save"));
+			} else if ("*".equals(key)) {
+				value = span("savePoint", "日記帳");
+			} else if (key.startsWith("$")) {
+				String gold = key.substring(1);
+				value = span("currency", gold + "Gold");
+			} else if (this.choiceMap.containsKey(key)) {
+				value = span("item", this.choiceMap.get(key));
+			} else if (this.charaMap.containsKey(key)) {
+				value = span("chara", this.charaMap.get(key));
+			} else if (this.placeMap.containsKey(key)) {
+				value = span("place", this.placeMap.get(key));
+			} else {
+				//System.out.println("***" + var);
+				value = "";
+			}
+			result = result.replace(var, value);
+		}
+		return result;
+	}
+
+	private String quote(String value) {
+		return "'" + value + "'";
+	}
 
 	private String indent(final int depth, final String values) {
 		StringBuilder buff = new StringBuilder();
@@ -32,18 +91,30 @@ public class ScenarioFile {
 				if (StringUtils.isBlank(line)) {
 					continue;
 				}
+				line = convertVariables(line);
+				if (line.startsWith("{")) {
+					line = line.replace("{", "[");
+					line = line.replace("}", "]");
+					buff.append(makeFunction(depth, "choose", line));
+					continue;
+				}
+				if (line.startsWith(":")) {
+					line = quote(line.substring(1));
+					buff.append(makeFunction(depth, "print", line));
+					continue;
+				}
 				buff.append(indent);
 				buff.append(line);
 				buff.append('\n');
 			}
-		} catch (IOException e) {
+		} catch (@SuppressWarnings("unused") IOException e) {
 			// nop
 		}
 		return buff.toString();
 	}
 
 	private String makeFunction(final int depth, final String name, final String ... args) {
-		String func = String.format("%s(%s);", name, StringUtils.join(args, ", "));
+		String func = String.format("%s%s(%s);", FUNC_PREFIX, name, StringUtils.join(args, ", "));
 
 		return indent(depth, func);
 	}
@@ -51,21 +122,20 @@ public class ScenarioFile {
 	private String analyzeIfElseStatement(final int depth, final Element element) {
 		String result;
 		String name = element.getNodeName();
-		NamedNodeMap nodeMap = element.getAttributes();
-		Node expNode = nodeMap.getNamedItem("true");
+		String exp = DOMUtil.getAttrValue(element, "true");
 
 		if ("if".equals(name)) {
 			StringBuilder buff = new StringBuilder();
 			buff.append("if (");
-			buff.append(expNode.getNodeValue());
+			buff.append(exp);
 			buff.append(") {");
 			result = indent(depth, buff.toString());
 		} else {
 			StringBuilder buff = new StringBuilder();
 			buff.append("} else ");
-			if (expNode != null) {
+			if (StringUtils.isNotBlank(exp)) {
 				buff.append("if (");
-				buff.append(expNode.getNodeValue());
+				buff.append(exp);
 				buff.append(") ");
 			}
 			buff.append("{");
@@ -91,29 +161,79 @@ public class ScenarioFile {
 			Element element = (Element) node;
 			String name = node.getNodeName();
 			boolean isIf = "if".equals(name);
+			boolean isWhile = "while".equals(name);
 
 			if (isIf) {
 				buff.append(analyzeIfElseStatement(depth, element));
+			} else if (isWhile) {
+				String stmt = "while (true) {";
+				buff.append(indent(depth, stmt));
 			} else if ("else".equals(name)) {
 				buff.append(analyzeIfElseStatement(depth, element));
+			} else if ("game".equals(name)) {
+				buff.append(makeFunction(depth, "gameOver"));
 			} else if ("nop".equals(name)) {
 				continue;
 			} else if ("call".equals(name)) {
-				String id = DOMUtil.getAttrValue(element, "id");
+				String id = quote(DOMUtil.getAttrValue(element, "id"));
 
-				buff.append(makeFunction(depth, id));
+				buff.append(makeFunction(depth, "call", id));
 			} else if ("jump".equals(name)) {
-				String mapId = DOMUtil.getAttrValue(element, "map");
+				String mapId = "'map" + DOMUtil.getAttrValue(element, "map") + "'";
 				String x = DOMUtil.getAttrValue(element, "x");
 				String y = DOMUtil.getAttrValue(element, "y");
 
 				buff.append(makeFunction(depth, "jump", mapId, x, y));
-			} else if ("set".equals(name)) {
-				String to = DOMUtil.getAttrValue(element, "to");
-				String val = DOMUtil.getAttrValue(element, "val");
-				String stmt = String.format("%s = %s;", to, val);
+			} else if ("effect".equals(name)) {
+				String fade = DOMUtil.getAttrValue(element, "fade");
 
-				buff.append(indent(depth, stmt));
+				buff.append(makeFunction(depth, "effect", fade));
+			} else if ("set".equals(name)) {
+				String to = quote(DOMUtil.getAttrValue(element, "to"));
+				String val = DOMUtil.getAttrValue(element, "val");
+
+				buff.append(makeFunction(depth, "set", to, val));
+			} else if ("add".equals(name)) {
+				String to = quote(DOMUtil.getAttrValue(element, "to"));
+				String val = DOMUtil.getAttrValue(element, "val");
+
+				buff.append(makeFunction(depth, "add", to, val));
+			} else if ("sub".equals(name)) {
+				String from = DOMUtil.getAttrValue(element, "from");
+				String val = DOMUtil.getAttrValue(element, "val");
+
+				buff.append(makeFunction(depth, "sub", from, val));
+			} else if ("img".equals(name)) {
+				String src = quote(DOMUtil.getAttrValue(element, "src"));
+				String alt = quote(DOMUtil.getAttrValue(element, "alt"));
+
+				buff.append(makeFunction(depth, "img", src, alt));
+			} else if ("actor".equals(name)) {
+				String id = quote(DOMUtil.getAttrValue(element, "id"));
+				String x = DOMUtil.getAttrValue(element, "x");
+				String y = DOMUtil.getAttrValue(element, "y");
+				String seq = DOMUtil.getAttrValue(element, "seq");
+				String event = quote(DOMUtil.getAttrValue(element, "event"));
+
+				buff.append(makeFunction(depth, "actor", id, x, y, seq, event));
+			} else if ("enemy".equals(name)) {
+				String id = quote(DOMUtil.getAttrValue(element, "id"));
+				String x = DOMUtil.getAttrValue(element, "x");
+				String y = DOMUtil.getAttrValue(element, "y");
+				String seq = DOMUtil.getAttrValue(element, "seq");
+				String level = DOMUtil.getAttrValue(element, "level");
+
+				buff.append(makeFunction(depth, "enemy", id, x, y, seq, level));
+			} else if ("bye".equals(name)) {
+				String id = quote(DOMUtil.getAttrValue(element, "id"));
+
+				buff.append(makeFunction(depth, "bye", id));
+			} else if ("check".equals(name)) {
+				String map = quote(DOMUtil.getAttrValue(element, "map"));
+				String x = DOMUtil.getAttrValue(element, "x");
+				String y = DOMUtil.getAttrValue(element, "y");
+
+				buff.append(makeFunction(depth, "check", map, x, y));
 			} else {
 				buff.append('\n');
 				buff.append('【');
@@ -123,7 +243,7 @@ public class ScenarioFile {
 			}
 			String child = analyzeChild(depth + 1, node);
 			buff.append(child);
-			if (isIf) {
+			if (isIf || isWhile) {
 				buff.append(indent(depth, "}"));
 			}
 		}
@@ -131,21 +251,75 @@ public class ScenarioFile {
 	}
 
 	private void loadFunctions(Document doc) {
-		NodeList functionList = doc.getElementsByTagName("function");
+		NodeList nodeList = doc.getElementsByTagName("function");
 
-		for (int ix = 0; ix < functionList.getLength(); ix++) {
-			Node node = functionList.item(ix);
-			NamedNodeMap nodeMap = node.getAttributes();
-			String id = nodeMap.getNamedItem("id").getNodeValue();
-			String title = nodeMap.getNamedItem("title").getNodeValue();
-			String func = String.format("▼%02x:[%s]%s", Integer.valueOf(ix + 1), id, title);
+		for (int ix = 0; ix < nodeList.getLength(); ix++) {
+			Integer number = Integer.valueOf(ix + 1);
+			Element element = (Element) nodeList.item(ix);
+			String id = DOMUtil.getAttrValue(element, "id");
+			String title = DOMUtil.getAttrValue(element, "title");
+//			String func = String.format("▼%02x:[%s]%s", number, id, title);
+			String contents = analyzeChild(1, element);
 
-			System.out.println(func);
-			String contents = analyzeChild(1, node);
-			System.out.println(contents);
+//			System.out.println(func);
+//			System.out.println(contents);
+			this.eventMap.put(id, contents);
+			this.eventNumberMap.put(number, id);
 		}
 	}
 
+	private void loadPlaces(Document doc) {
+		NodeList nodeList = doc.getElementsByTagName("place");
+
+		for (int ix = 0; ix < nodeList.getLength(); ix++) {
+			Element element = (Element) nodeList.item(ix);
+			String id = DOMUtil.getAttrValue(element, "id");
+			String name = DOMUtil.getAttrValue(element, "name");
+
+			this.placeMap.put(id, name);
+		}
+	}
+
+	private void loadCharacters(Document doc) {
+		NodeList nodeList = doc.getElementsByTagName("chara");
+
+		for (int ix = 0; ix < nodeList.getLength(); ix++) {
+			Element element = (Element) nodeList.item(ix);
+			String id = DOMUtil.getAttrValue(element, "id");
+			String name = DOMUtil.getAttrValue(element, "name");
+			String src = DOMUtil.getAttrValue(element, "src");
+
+			this.charaMap.put(id, name);
+		}
+	}
+
+	private void loadItems(Document doc) {
+		NodeList nodeList = doc.getElementsByTagName("item");
+
+		for (int ix = 0; ix < nodeList.getLength(); ix++) {
+			Element element = (Element) nodeList.item(ix);
+			String id = DOMUtil.getAttrValue(element, "id");
+			String name = DOMUtil.getAttrValue(element, "name");
+			String src = DOMUtil.getAttrValue(element, "src");
+			String event = DOMUtil.getAttrValue(element, "event");
+
+			this.choiceMap.put(id, name);
+		}
+	}
+
+	/**
+	 * イベントIDを取得.
+	 * @param number イベント番号
+	 * @return イベントID
+	 */
+	public String getEventId(int number) {
+		return this.eventNumberMap.get(Integer.valueOf(number));
+	}
+
+	/**
+	 * シナリオファイルをロード.
+	 * @param file ファイル
+	 */
 	public void load(File file) {
 		Document doc;
 		try {
@@ -155,6 +329,9 @@ public class ScenarioFile {
 			e.printStackTrace();
 			return;
 		}
+		loadItems(doc);
+		loadCharacters(doc);
+		loadPlaces(doc);
 		loadFunctions(doc);
 	}
 }

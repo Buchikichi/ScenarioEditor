@@ -10,6 +10,8 @@ import javax.imageio.ImageIO;
 import javax.swing.JFileChooser;
 
 import net.arnx.jsonic.JSON;
+import to.kit.scenario.edit.info.MapEvent;
+import to.kit.scenario.edit.info.MapInfo;
 import to.kit.scenario.edit.io.ScenarioFile;
 
 /**
@@ -36,22 +38,27 @@ public class ScenarioEditorMain extends EditorFrame {
 		}
 	}
 
-	@Override
-	protected void save() {
-		BufferedImage bgImage = this.mapPane.getBgImage();
+	private void saveMap(String filename) {
+		String wallName = filename.replaceAll(FILE_EXT, ".map");
+		MapInfo mapInfo = this.mapPane.getMapInfo();
 
-		if (bgImage == null) {
-			return;
+		for (MapEvent event : mapInfo.getEventList()) {
+			String eventId = this.scenario.getEventId(event.getEventNum());
+
+			event.setEventId(eventId);
 		}
-		int res = this.chooser.showSaveDialog(this);
-		if (res != JFileChooser.APPROVE_OPTION) {
-			return;
+		try (FileWriter out = new FileWriter(new File(wallName))) {
+			out.write(JSON.encode(mapInfo));
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
-		File file = this.chooser.getSelectedFile();
-		String filename = file.getAbsolutePath();
+	}
+
+	private void saveImage(String filename) {
+		BufferedImage bgImage = this.mapPane.getBgImage();
+		BufferedImage stImage = this.mapPane.getStairImage();
 		String bgName = filename.replaceAll(FILE_EXT, "bg.png");
 		String stName = filename.replaceAll(FILE_EXT, "st.png");
-		BufferedImage stImage = this.mapPane.getStairImage();
 
 		try {
 			ImageIO.write(bgImage, "png", new File(bgName));
@@ -59,14 +66,28 @@ public class ScenarioEditorMain extends EditorFrame {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		String wallName = filename.replaceAll(FILE_EXT, ".map");
-		String wallData = JSON.encode(this.mapPane.getMapInfo());
+	}
 
-		try (FileWriter out = new FileWriter(new File(wallName))) {
-			out.write(wallData);
-		} catch (IOException e) {
-			e.printStackTrace();
+	@Override
+	protected void save() {
+		if (this.mapPane.getBgImage() == null) {
+			return;
 		}
+		int res = this.chooser.showSaveDialog(this);
+		if (res != JFileChooser.APPROVE_OPTION) {
+			return;
+		}
+		File dir = this.chooser.getSelectedFile();
+
+		for (int ix = 0; ix < this.listBox.getItemCount(); ix++) {
+			String name = this.listBox.getItemAt(ix);
+			File file = new File(dir, name);
+			String filename = file.getAbsolutePath();
+
+			saveImage(filename);
+			saveMap(filename);
+		}
+		System.out.println("saved.");
 	}
 
 	@Override

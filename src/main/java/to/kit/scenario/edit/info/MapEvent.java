@@ -7,6 +7,7 @@ package to.kit.scenario.edit.info;
 public final class MapEvent {
 	private final String position;
 	private final int eventNum;
+	private String eventId;
 
 	/**
 	 * イベント発生位置を取得.
@@ -22,6 +23,22 @@ public final class MapEvent {
 	 */
 	public int getEventNum() {
 		return this.eventNum;
+	}
+
+	/**
+	 * イベントIDを取得.
+	 * @return イベントID
+	 */
+	public String getEventId() {
+		return this.eventId;
+	}
+
+	/**
+	 * イベントIDを設定
+	 * @param val イベントID
+	 */
+	public void setEventId(String val) {
+		this.eventId = val;
 	}
 
 	/**
