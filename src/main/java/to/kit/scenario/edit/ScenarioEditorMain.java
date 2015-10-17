@@ -25,7 +25,7 @@ public class ScenarioEditorMain extends EditorFrame {
 	private ScenarioFile scenario = new ScenarioFile();
 
 	private void listMapFiles() {
-		File dir = this.chooser.getCurrentDirectory();
+		File dir = this.chooser.getSelectedFile();
 
 		this.listBox.removeAllItems();
 		for (File file : dir.listFiles()) {
@@ -38,7 +38,7 @@ public class ScenarioEditorMain extends EditorFrame {
 		}
 	}
 
-	private void saveMap(String filename) {
+	private void saveMap(String filename) throws IOException {
 		String wallName = filename.replaceAll(FILE_EXT, ".map");
 		MapInfo mapInfo = this.mapPane.getMapInfo();
 
@@ -49,27 +49,29 @@ public class ScenarioEditorMain extends EditorFrame {
 		}
 		try (FileWriter out = new FileWriter(new File(wallName))) {
 			out.write(JSON.encode(mapInfo));
-		} catch (IOException e) {
-			e.printStackTrace();
 		}
 	}
 
-	private void saveImage(String filename) {
+	private void saveImage(String filename) throws IOException {
 		BufferedImage bgImage = this.mapPane.getBgImage();
 		BufferedImage stImage = this.mapPane.getStairImage();
 		String bgName = filename.replaceAll(FILE_EXT, "bg.png");
 		String stName = filename.replaceAll(FILE_EXT, "st.png");
 
-		try {
-			ImageIO.write(bgImage, "png", new File(bgName));
-			ImageIO.write(stImage, "png", new File(stName));
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+		ImageIO.write(bgImage, "png", new File(bgName));
+		ImageIO.write(stImage, "png", new File(stName));
+	}
+
+	private void openScenario() {
+		File dir = this.chooser.getSelectedFile();
+		File scenarioFile = new File(dir, "scene.xml");
+
+		this.scenario.load(scenarioFile);
+		listMapFiles();
 	}
 
 	@Override
-	protected void save() {
+	protected void save() throws IOException {
 		if (this.mapPane.getBgImage() == null) {
 			return;
 		}
@@ -77,6 +79,8 @@ public class ScenarioEditorMain extends EditorFrame {
 		if (res != JFileChooser.APPROVE_OPTION) {
 			return;
 		}
+
+		// image/map
 		File dir = this.chooser.getSelectedFile();
 
 		for (int ix = 0; ix < this.listBox.getItemCount(); ix++) {
@@ -84,9 +88,14 @@ public class ScenarioEditorMain extends EditorFrame {
 			File file = new File(dir, name);
 			String filename = file.getAbsolutePath();
 
+			mapChanged(name);
 			saveImage(filename);
 			saveMap(filename);
 		}
+
+		// scene
+		this.scenario.save(new File(dir, "scene.json"));
+		this.scenario.archive(dir, "whjr000s.jar");
 		System.out.println("saved.");
 	}
 
@@ -101,7 +110,7 @@ public class ScenarioEditorMain extends EditorFrame {
 
 	@Override
 	protected void mapChanged(String name) {
-		File dir = this.chooser.getCurrentDirectory();
+		File dir = this.chooser.getSelectedFile();
 		File file = new File(dir, name);
 		String filename = file.getAbsolutePath();
 
@@ -136,10 +145,8 @@ public class ScenarioEditorMain extends EditorFrame {
 			return;
 		}
 		this.chooser.setCurrentDirectory(dir);
-		listMapFiles();
-		File scenarioFile = new File(dir, "scene.xml");
-
-		this.scenario.load(scenarioFile);
+		this.chooser.setSelectedFile(dir);
+		openScenario();
 	}
 
 	/**

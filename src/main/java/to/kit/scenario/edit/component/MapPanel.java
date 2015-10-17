@@ -156,7 +156,7 @@ public final class MapPanel extends JPanel implements ActionListener {
 			this.mapInfo = new MapInfo(width, height, posX, posY);
 			this.actor.setX(posX);
 			this.actor.setY(posY);
-			System.out.println("@" + posX + "," + posY);
+			System.out.println("@" + posX + "," + posY + "[" + width + "x" + height + "]");
 			System.out.println("block:" + block);
 			System.out.println("object:" + object);
 			for (int ix = 0; ix < 8; ix++) {
@@ -171,6 +171,9 @@ public final class MapPanel extends JPanel implements ActionListener {
 		}
 		this.actor.setVisible(true);
 		this.timer.start();
+		// ここで描かないとsave出来ない
+		initImage();
+		drawImage();
 	}
 
 	@Override

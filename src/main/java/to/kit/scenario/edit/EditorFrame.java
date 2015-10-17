@@ -8,6 +8,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
+import java.io.IOException;
 
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
@@ -35,7 +36,7 @@ public abstract class EditorFrame extends JFrame {
 	protected JScrollPane scrollPane = new JScrollPane(this.mapPane);
 
 	protected abstract void open();
-	protected abstract void save();
+	protected abstract void save() throws IOException;
 	protected abstract void mapChanged(String name);
 
 	/**
@@ -68,8 +69,12 @@ public abstract class EditorFrame extends JFrame {
 		
 		JButton btnSave = new JButton("Save");
 		btnSave.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				save();
+			public void actionPerformed(ActionEvent ev) {
+				try {
+					save();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
 			}
 		});
 		btnSave.setSize(40, 20);
