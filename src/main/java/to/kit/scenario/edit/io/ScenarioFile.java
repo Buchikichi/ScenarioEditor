@@ -31,6 +31,7 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
 import net.arnx.jsonic.JSON;
+import to.kit.scenario.edit.info.Actor;
 import to.kit.scenario.edit.info.Scenario;
 
 /**
@@ -44,7 +45,7 @@ public final class ScenarioFile {
 
 	private Scenario scenario = new Scenario();
 	private Map<String, String> choiceMap = new HashMap<>();
-	private Map<String, String> charaMap = new HashMap<>();
+	private Map<String, Actor> actorMap = new HashMap<>();
 	private Map<String, String> placeMap = new HashMap<>();
 	private Map<Integer, String> eventNumberMap = new HashMap<>();
 
@@ -78,8 +79,9 @@ public final class ScenarioFile {
 				value = span("currency", gold + "Gold");
 			} else if (this.choiceMap.containsKey(key)) {
 				value = span("item", this.choiceMap.get(key));
-			} else if (this.charaMap.containsKey(key)) {
-				value = span("chara", this.charaMap.get(key));
+			} else if (this.actorMap.containsKey(key)) {
+				Actor actor = this.actorMap.get(key);
+				value = span("chara", actor.getName());
 			} else if (this.placeMap.containsKey(key)) {
 				value = span("place", this.placeMap.get(key));
 			} else {
@@ -91,8 +93,11 @@ public final class ScenarioFile {
 			}
 			result = result.replace(var, value);
 		}
-		result = result.replaceAll("dialog", "mng.dialog");
-		result = result.replaceAll("cntProgress", "mng.progress");
+		result = result.replace("dialog", "mng.dialog");
+		result = result.replace("cntProgress", "mng.progress");
+		for (String key : this.choiceMap.keySet()) {
+			result = result.replace(key, "mng." + key);
+		}
 		return result;
 	}
 
@@ -226,13 +231,15 @@ public final class ScenarioFile {
 
 				buff.append(makeFunction(depth, "img", src, alt));
 			} else if ("actor".equals(name)) {
-				String id = quote(DOMUtil.getAttrValue(element, "id"));
+				String id = DOMUtil.getAttrValue(element, "id");
+				Actor actor = this.actorMap.get(id);
+				String src = "chr" + actor.getSrc();
 				String x = DOMUtil.getAttrValue(element, "x");
 				String y = DOMUtil.getAttrValue(element, "y");
 				String seq = DOMUtil.getAttrValue(element, "seq");
 				String event = quote(DOMUtil.getAttrValue(element, "event"));
 
-				buff.append(makeFunction(depth, "actor", id, x, y, seq, event));
+				buff.append(makeFunction(depth, "actor", quote(id), quote(src), x, y, seq, event));
 			} else if ("enemy".equals(name)) {
 				String id = quote(DOMUtil.getAttrValue(element, "id"));
 				String x = DOMUtil.getAttrValue(element, "x");
@@ -307,7 +314,7 @@ public final class ScenarioFile {
 			String name = DOMUtil.getAttrValue(element, "name");
 			String src = DOMUtil.getAttrValue(element, "src");
 
-			this.charaMap.put(id, name);
+			this.actorMap.put(id, new Actor(name, src));
 		}
 	}
 
