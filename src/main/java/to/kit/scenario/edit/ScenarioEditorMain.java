@@ -9,6 +9,9 @@ import java.io.IOException;
 import javax.imageio.ImageIO;
 import javax.swing.JFileChooser;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import net.arnx.jsonic.JSON;
 import to.kit.scenario.edit.info.MapEvent;
 import to.kit.scenario.edit.info.MapInfo;
@@ -19,6 +22,8 @@ import to.kit.scenario.edit.io.ScenarioFile;
  * @author Hidetaka Sasai
  */
 public class ScenarioEditorMain extends EditorFrame {
+	/** Logger. */
+	private static final Logger LOG = LoggerFactory.getLogger(ScenarioEditorMain.class);
 	private static final String FILE_EXT = ".dat";
 
 	private JFileChooser chooser = new JFileChooser();
@@ -96,7 +101,6 @@ public class ScenarioEditorMain extends EditorFrame {
 		// scene
 		this.scenario.save(new File(dir, "scene.json"));
 		this.scenario.archive(dir, "whjr000s.jar");
-		System.out.println("saved.");
 	}
 
 	@Override

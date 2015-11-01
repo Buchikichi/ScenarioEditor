@@ -24,6 +24,8 @@ import javax.xml.parsers.ParserConfigurationException;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.xerces.util.DOMUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -39,6 +41,9 @@ import to.kit.scenario.edit.info.Scenario;
  * @author Hidetaka Sasai
  */
 public final class ScenarioFile {
+	/** Logger. */
+	private static final Logger LOG = LoggerFactory.getLogger(ScenarioFile.class);
+
 	private static final String FUNC_PREFIX = "mng.";
 	private static final String VARIABLE_PATTERN = "@[$*a-zA-Z0-9]+[ ]*";
 	private final Pattern variablePattern = Pattern.compile(VARIABLE_PATTERN);
@@ -95,6 +100,7 @@ public final class ScenarioFile {
 		}
 		result = result.replace("dialog", "mng.dialog");
 		result = result.replace("cntProgress", "mng.progress");
+		result = result.replace("$", "mng.gold");
 		for (String key : this.choiceMap.keySet()) {
 			result = result.replace(key, "mng." + key);
 		}
@@ -118,11 +124,19 @@ public final class ScenarioFile {
 					line = line.replace("{", "[");
 					line = line.replace("}", "]");
 					buff.append(makeFunction(depth, "choose", line));
+					buff.append("yield;\n");
+					continue;
+				}
+				if (":".equals(line)) {
+					buff.append(makeFunction(depth, "wait"));
+					buff.append("yield;\n");
 					continue;
 				}
 				if (line.startsWith(":")) {
-					line = quote(line.substring(1));
-					buff.append(makeFunction(depth, "print", line));
+					line = line.substring(1);
+					for (String part : line.split(";")) {
+						buff.append(makeFunction(depth, "print", quote(part + "\\n")));
+					}
 					continue;
 				}
 				buff.append(indent);
@@ -200,6 +214,7 @@ public final class ScenarioFile {
 				String id = quote(DOMUtil.getAttrValue(element, "id"));
 
 				buff.append(makeFunction(depth, "call", id));
+				buff.append("yield;\n");
 			} else if ("jump".equals(name)) {
 				String mapId = "'map" + DOMUtil.getAttrValue(element, "map") + "'";
 				String x = DOMUtil.getAttrValue(element, "x");
@@ -211,20 +226,23 @@ public final class ScenarioFile {
 
 				buff.append(makeFunction(depth, "effect", fade));
 			} else if ("set".equals(name)) {
-				String to = quote(DOMUtil.getAttrValue(element, "to"));
+				String to = DOMUtil.getAttrValue(element, "to");
 				String val = DOMUtil.getAttrValue(element, "val");
+				String str = to + " = " + val;
 
-				buff.append(makeFunction(depth, "set", to, val));
+				buff.append(indent(depth, str));
 			} else if ("add".equals(name)) {
-				String to = quote(DOMUtil.getAttrValue(element, "to"));
+				String to = DOMUtil.getAttrValue(element, "to");
 				String val = DOMUtil.getAttrValue(element, "val");
+				String str = to + " += " + val;
 
-				buff.append(makeFunction(depth, "add", to, val));
+				buff.append(indent(depth, str));
 			} else if ("sub".equals(name)) {
 				String from = DOMUtil.getAttrValue(element, "from");
 				String val = DOMUtil.getAttrValue(element, "val");
+				String str = from + " -= " + val;
 
-				buff.append(makeFunction(depth, "sub", from, val));
+				buff.append(indent(depth, str));
 			} else if ("img".equals(name)) {
 				String src = quote(DOMUtil.getAttrValue(element, "src"));
 				String alt = quote(DOMUtil.getAttrValue(element, "alt"));
@@ -366,6 +384,7 @@ public final class ScenarioFile {
 				}
 			}
 		}
+		LOG.debug("saved[{}]", zipFile.getAbsolutePath());
 	}
 
 	/**
@@ -384,6 +403,7 @@ public final class ScenarioFile {
 	 * @param file ファイル
 	 */
 	public void load(File file) {
+		LOG.debug("load[{}]", file.getAbsolutePath());
 		Document doc;
 		try {
 			DocumentBuilder builder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
