@@ -62,7 +62,7 @@ public final class ScenarioFile {
 		return "'" + value + "'";
 	}
 
-	private String convertVariables(final String str) {
+	private String convertNames(final String str) {
 		String result = str;
 		Matcher matcher = this.variablePattern.matcher(str);
 		Set<String> variables = new HashSet<>();
@@ -98,11 +98,18 @@ public final class ScenarioFile {
 			}
 			result = result.replace(var, value);
 		}
+		return result;
+	}
+
+	private String convertVariables(final String str) {
+		String result = str;
+
 		result = result.replace("dialog", "mng.dialog");
 		result = result.replace("cntProgress", "mng.progress");
 		result = result.replace("$", "mng.gold");
+		result = result.replace("hp", "mng.hp");
 		for (String key : this.choiceMap.keySet()) {
-			result = result.replace(key, "mng." + key);
+			result = result.replaceAll("\\b" + key + "\\b", "mng." + key);
 		}
 		return result;
 	}
@@ -119,7 +126,7 @@ public final class ScenarioFile {
 				if (StringUtils.isBlank(line)) {
 					continue;
 				}
-				line = convertVariables(line);
+				line = convertNames(line);
 				if (line.startsWith("{")) {
 					line = line.replace("{", "[");
 					line = line.replace("}", "]");
@@ -160,6 +167,7 @@ public final class ScenarioFile {
 		String name = element.getNodeName();
 		String exp = DOMUtil.getAttrValue(element, "true");
 
+		exp = convertVariables(exp);
 		if ("if".equals(name)) {
 			StringBuilder buff = new StringBuilder();
 			buff.append("if (");
@@ -228,19 +236,19 @@ public final class ScenarioFile {
 			} else if ("set".equals(name)) {
 				String to = DOMUtil.getAttrValue(element, "to");
 				String val = DOMUtil.getAttrValue(element, "val");
-				String str = to + " = " + val;
+				String str = convertVariables(to + " = " + val);
 
 				buff.append(indent(depth, str));
 			} else if ("add".equals(name)) {
 				String to = DOMUtil.getAttrValue(element, "to");
 				String val = DOMUtil.getAttrValue(element, "val");
-				String str = to + " += " + val;
+				String str = convertVariables(to + " += " + val);
 
 				buff.append(indent(depth, str));
 			} else if ("sub".equals(name)) {
 				String from = DOMUtil.getAttrValue(element, "from");
 				String val = DOMUtil.getAttrValue(element, "val");
-				String str = from + " -= " + val;
+				String str = convertVariables(from + " -= " + val);
 
 				buff.append(indent(depth, str));
 			} else if ("img".equals(name)) {
@@ -333,6 +341,7 @@ public final class ScenarioFile {
 			String src = DOMUtil.getAttrValue(element, "src");
 
 			this.actorMap.put(id, new Actor(name, src));
+			this.choiceMap.put(id, name);
 		}
 	}
 
