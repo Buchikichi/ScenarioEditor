@@ -8,8 +8,10 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringReader;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -34,6 +36,7 @@ import org.xml.sax.SAXException;
 
 import net.arnx.jsonic.JSON;
 import to.kit.scenario.edit.info.Actor;
+import to.kit.scenario.edit.info.Item;
 import to.kit.scenario.edit.info.Scenario;
 
 /**
@@ -48,11 +51,12 @@ public final class ScenarioFile {
 	private static final String VARIABLE_PATTERN = "@[$*a-zA-Z0-9]+[ ]*";
 	private final Pattern variablePattern = Pattern.compile(VARIABLE_PATTERN);
 
-	private Scenario scenario = new Scenario();
-	private Map<String, String> choiceMap = new HashMap<>();
-	private Map<String, Actor> actorMap = new HashMap<>();
-	private Map<String, String> placeMap = new HashMap<>();
-	private Map<Integer, String> eventNumberMap = new HashMap<>();
+	private final Scenario scenario = new Scenario();
+	private final List<String> variableList = new ArrayList<>();
+	private final Map<String, String> choiceMap = new HashMap<>();
+	private final Map<String, Actor> actorMap = new HashMap<>();
+	private final Map<String, String> placeMap = new HashMap<>();
+	private final Map<Integer, String> eventNumberMap = new HashMap<>();
 
 	private String span(final String styleClass, final String text) {
 		return "<span class=\"" + styleClass + "\">" + text + "</span>";
@@ -104,8 +108,6 @@ public final class ScenarioFile {
 	private String convertVariables(final String str) {
 		String result = str;
 
-		result = result.replace("dialog", "mng.dialog");
-		result = result.replace("cntProgress", "mng.progress");
 		result = result.replace("$", "mng.gold");
 		result = result.replace("hp", "mng.hp");
 		for (String key : this.choiceMap.keySet()) {
@@ -224,11 +226,11 @@ public final class ScenarioFile {
 				buff.append(makeFunction(depth, "call", id));
 				buff.append("yield;\n");
 			} else if ("jump".equals(name)) {
-				String mapId = "'map" + DOMUtil.getAttrValue(element, "map") + "'";
+				String mapId = "map" + DOMUtil.getAttrValue(element, "map");
 				String x = DOMUtil.getAttrValue(element, "x");
 				String y = DOMUtil.getAttrValue(element, "y");
 
-				buff.append(makeFunction(depth, "jump", mapId, x, y));
+				buff.append(makeFunction(depth, "jump", quote(mapId), x, y));
 			} else if ("effect".equals(name)) {
 				String fade = DOMUtil.getAttrValue(element, "fade");
 
@@ -259,7 +261,7 @@ public final class ScenarioFile {
 			} else if ("actor".equals(name)) {
 				String id = DOMUtil.getAttrValue(element, "id");
 				Actor actor = this.actorMap.get(id);
-				String src = "chr" + actor.getSrc();
+				String src = actor.getSrc();
 				String x = DOMUtil.getAttrValue(element, "x");
 				String y = DOMUtil.getAttrValue(element, "y");
 				String seq = DOMUtil.getAttrValue(element, "seq");
@@ -267,13 +269,15 @@ public final class ScenarioFile {
 
 				buff.append(makeFunction(depth, "actor", quote(id), quote(src), x, y, seq, event));
 			} else if ("enemy".equals(name)) {
-				String id = quote(DOMUtil.getAttrValue(element, "id"));
+				String id = DOMUtil.getAttrValue(element, "id");
+				Actor actor = this.actorMap.get(id);
+				String src = "chr" + actor.getSrc();
 				String x = DOMUtil.getAttrValue(element, "x");
 				String y = DOMUtil.getAttrValue(element, "y");
 				String seq = DOMUtil.getAttrValue(element, "seq");
 				String level = DOMUtil.getAttrValue(element, "level");
 
-				buff.append(makeFunction(depth, "enemy", id, x, y, seq, level));
+				buff.append(makeFunction(depth, "enemy", quote(id), quote(src), x, y, seq, level));
 			} else if ("bye".equals(name)) {
 				String id = quote(DOMUtil.getAttrValue(element, "id"));
 
@@ -300,6 +304,17 @@ public final class ScenarioFile {
 		return buff.toString();
 	}
 
+	private String getInitProcess() {
+		StringBuilder buff = new StringBuilder();
+
+		for (String name : this.variableList) {
+			String exp = FUNC_PREFIX + name + " = 0";
+
+			buff.append(indent(1, exp));
+		}
+		return buff.toString();
+	}
+
 	private void loadFunctions(Document doc) {
 		NodeList nodeList = doc.getElementsByTagName("function");
 
@@ -310,12 +325,26 @@ public final class ScenarioFile {
 			String title = DOMUtil.getAttrValue(element, "title");
 //			String func = String.format("▼%02x:[%s]%s", number, id, title);
 			String contents = analyzeChild(1, element);
+			boolean isFirstEvent = id.equals(this.scenario.getFirstEvent());
 
+			if (isFirstEvent) {
+				contents = getInitProcess() + contents;
+			}
 //			System.out.println(func);
 //			System.out.println(contents);
-			this.scenario.setFirstEvent("gameStart");
 			this.scenario.addFunction(id, title, contents);
 			this.eventNumberMap.put(number, id);
+		}
+	}
+
+	private void loadFirstEvent(Document doc) {
+		NodeList startNodeList = doc.getElementsByTagName("start");
+
+		if (0 < startNodeList.getLength()) {
+			Element element = (Element) startNodeList.item(0);
+			String event = DOMUtil.getAttrValue(element, "event");
+
+			this.scenario.setFirstEvent(event);
 		}
 	}
 
@@ -338,24 +367,41 @@ public final class ScenarioFile {
 			Element element = (Element) nodeList.item(ix);
 			String id = DOMUtil.getAttrValue(element, "id");
 			String name = DOMUtil.getAttrValue(element, "name");
-			String src = DOMUtil.getAttrValue(element, "src");
+			String src = "chr" + DOMUtil.getAttrValue(element, "src");
 
 			this.actorMap.put(id, new Actor(name, src));
+			this.variableList.add(id);
 			this.choiceMap.put(id, name);
 		}
 	}
 
 	private void loadItems(Document doc) {
 		NodeList nodeList = doc.getElementsByTagName("item");
+		List<Item> itemList = this.scenario.getItemList();
 
 		for (int ix = 0; ix < nodeList.getLength(); ix++) {
 			Element element = (Element) nodeList.item(ix);
 			String id = DOMUtil.getAttrValue(element, "id");
 			String name = DOMUtil.getAttrValue(element, "name");
 			String src = DOMUtil.getAttrValue(element, "src");
-			String event = DOMUtil.getAttrValue(element, "event");
 
+			if (StringUtils.isNotBlank(src)) {
+				itemList.add(new Item(id, name, "item" + src));
+			}
+			this.variableList.add(id);
 			this.choiceMap.put(id, name);
+		}
+	}
+
+	private void loadVariables(Document doc) {
+		NodeList nodeList = doc.getElementsByTagName("count");
+
+		for (int ix = 0; ix < nodeList.getLength(); ix++) {
+			Element element = (Element) nodeList.item(ix);
+			String id = DOMUtil.getAttrValue(element, "id");
+
+			this.variableList.add(id);
+			this.choiceMap.put(id, StringUtils.EMPTY);
 		}
 	}
 
@@ -403,7 +449,7 @@ public final class ScenarioFile {
 	 */
 	public void save(File file) throws IOException {
 		try (FileWriter out = new FileWriter(file)) {
-			out.write(JSON.encode(this.scenario, true));
+			out.write(JSON.encode(this.scenario, false));
 		}
 	}
 
@@ -421,9 +467,11 @@ public final class ScenarioFile {
 			e.printStackTrace();
 			return;
 		}
+		loadVariables(doc);
 		loadItems(doc);
 		loadCharacters(doc);
 		loadPlaces(doc);
+		loadFirstEvent(doc);
 		loadFunctions(doc);
 	}
 }

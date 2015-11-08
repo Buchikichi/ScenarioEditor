@@ -1,6 +1,8 @@
 package to.kit.scenario.edit.info;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -9,7 +11,8 @@ import java.util.Map;
  */
 public final class Scenario {
 	private String firstEvent;
-	private final Map<String, ScenarioFunction> functionMap = new HashMap<>();
+	private Map<String, ScenarioFunction> functionMap = new HashMap<>();
+	private List<Item> itemList = new ArrayList<>();
 
 	/**
 	 * ファンクションを追加.
@@ -21,12 +24,6 @@ public final class Scenario {
 		this.functionMap.put(id, new ScenarioFunction(name, contents));
 	}
 
-	/**
-	 * @return the functionMap
-	 */
-	public Map<String, ScenarioFunction> getFunctionMap() {
-		return this.functionMap;
-	}
 	/**
 	 * 最初のイベントを取得.
 	 * @return 最初のイベント
@@ -41,31 +38,32 @@ public final class Scenario {
 	public void setFirstEvent(String firstEvent) {
 		this.firstEvent = firstEvent;
 	}
-
-	class ScenarioFunction {
-		private final String name;
-		private final String contents;
-
-		/**
-		 * @return the title
-		 */
-		public String getName() {
-			return this.name;
-		}
-		/**
-		 * @return the contents
-		 */
-		public String getContents() {
-			return this.contents;
-		}
-		/**
-		 * インスタンス生成.
-		 * @param name ファンクション名
-		 * @param contents ファンクション内容
-		 */
-		public ScenarioFunction(String name, String contents) {
-			this.name = name;
-			this.contents = contents;
-		}
+	/**
+	 * ファンクションマップを取得.
+	 * @return ファンクションマップ
+	 */
+	public Map<String, ScenarioFunction> getFunctionMap() {
+		return this.functionMap;
+	}
+	/**
+	 * ファンクションマップを設定.
+	 * @param functionMap ファンクションマップ
+	 */
+	public void setFunctionMap(Map<String, ScenarioFunction> functionMap) {
+		this.functionMap = functionMap;
+	}
+	/**
+	 * アイテム一覧を取得.
+	 * @return アイテム一覧
+	 */
+	public List<Item> getItemList() {
+		return this.itemList;
+	}
+	/**
+	 * アイテム一覧を設定.
+	 * @param itemList アイテム一覧
+	 */
+	public void setItemList(List<Item> itemList) {
+		this.itemList = itemList;
 	}
 }
