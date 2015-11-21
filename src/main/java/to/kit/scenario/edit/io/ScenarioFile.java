@@ -57,6 +57,7 @@ public final class ScenarioFile {
 	private final Map<String, Actor> actorMap = new HashMap<>();
 	private final Map<String, String> placeMap = new HashMap<>();
 	private final Map<Integer, String> eventNumberMap = new HashMap<>();
+	private int yieldStep;
 
 	private String span(final String styleClass, final String text) {
 		return "<span class=\"" + styleClass + "\">" + text + "</span>";
@@ -64,6 +65,11 @@ public final class ScenarioFile {
 
 	private String quote(String value) {
 		return "'" + value + "'";
+	}
+
+	private String makeYield() {
+		this.yieldStep++;
+		return "yield " + this.yieldStep + ";\n";
 	}
 
 	private String convertNames(final String str) {
@@ -108,7 +114,7 @@ public final class ScenarioFile {
 	private String convertVariables(final String str) {
 		String result = str;
 
-		result = result.replace("$", "mng.gold");
+		result = result.replace("$", "gold");
 		result = result.replace("hp", "mng.hp");
 		for (String key : this.choiceMap.keySet()) {
 			result = result.replaceAll("\\b" + key + "\\b", "mng." + key);
@@ -133,12 +139,12 @@ public final class ScenarioFile {
 					line = line.replace("{", "[");
 					line = line.replace("}", "]");
 					buff.append(makeFunction(depth, "choose", line));
-					buff.append("yield;\n");
+					buff.append(makeYield());
 					continue;
 				}
 				if (":".equals(line)) {
 					buff.append(makeFunction(depth, "wait"));
-					buff.append("yield;\n");
+					buff.append(makeYield());
 					continue;
 				}
 				if (line.startsWith(":")) {
@@ -194,6 +200,9 @@ public final class ScenarioFile {
 		StringBuilder buff = new StringBuilder();
 		NodeList childList = parentNode.getChildNodes();
 
+		if (depth == 1) {
+			this.yieldStep = 0;
+		}
 		for (int ix = 0; ix < childList.getLength(); ix++) {
 			Node node = childList.item(ix);
 			int type = node.getNodeType();
@@ -224,13 +233,19 @@ public final class ScenarioFile {
 				String id = quote(DOMUtil.getAttrValue(element, "id"));
 
 				buff.append(makeFunction(depth, "call", id));
-				buff.append("yield;\n");
+				buff.append(makeYield());
 			} else if ("jump".equals(name)) {
 				String mapId = "map" + DOMUtil.getAttrValue(element, "map");
 				String x = DOMUtil.getAttrValue(element, "x");
 				String y = DOMUtil.getAttrValue(element, "y");
 
 				buff.append(makeFunction(depth, "jump", quote(mapId), x, y));
+			} else if ("check".equals(name)) {
+				String mapId = "map" + DOMUtil.getAttrValue(element, "map");
+				String x = DOMUtil.getAttrValue(element, "x");
+				String y = DOMUtil.getAttrValue(element, "y");
+
+				buff.append(makeFunction(depth, "check", quote(mapId), x, y));
 			} else if ("effect".equals(name)) {
 				String fade = DOMUtil.getAttrValue(element, "fade");
 
@@ -271,23 +286,18 @@ public final class ScenarioFile {
 			} else if ("enemy".equals(name)) {
 				String id = DOMUtil.getAttrValue(element, "id");
 				Actor actor = this.actorMap.get(id);
-				String src = "chr" + actor.getSrc();
+				String src = actor.getSrc();
 				String x = DOMUtil.getAttrValue(element, "x");
 				String y = DOMUtil.getAttrValue(element, "y");
 				String seq = DOMUtil.getAttrValue(element, "seq");
 				String level = DOMUtil.getAttrValue(element, "level");
+				String event = quote(DOMUtil.getAttrValue(element, "event"));
 
-				buff.append(makeFunction(depth, "enemy", quote(id), quote(src), x, y, seq, level));
+				buff.append(makeFunction(depth, "enemy", quote(id), quote(src), x, y, seq, level, event));
 			} else if ("bye".equals(name)) {
 				String id = quote(DOMUtil.getAttrValue(element, "id"));
 
 				buff.append(makeFunction(depth, "bye", id));
-			} else if ("check".equals(name)) {
-				String map = quote(DOMUtil.getAttrValue(element, "map"));
-				String x = DOMUtil.getAttrValue(element, "x");
-				String y = DOMUtil.getAttrValue(element, "y");
-
-				buff.append(makeFunction(depth, "check", map, x, y));
 			} else {
 				buff.append('\n');
 				buff.append('【');
