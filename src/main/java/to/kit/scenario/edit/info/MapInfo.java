@@ -12,6 +12,7 @@ public final class MapInfo {
 	private final Location pos;
 	private int[][] wall;
 	private final List<MapEvent> eventList = new ArrayList<>();
+	private final List<MapAnim> animList = new ArrayList<>();
 
 	/**
 	 * マップサイズを取得.
@@ -45,6 +46,13 @@ public final class MapInfo {
 	 */
 	public List<MapEvent> getEventList() {
 		return this.eventList;
+	}
+	/**
+	 * アニメーション一覧を取得.
+	 * @return アニメーション一覧.
+	 */
+	public List<MapAnim> getAnimList() {
+		return this.animList;
 	}
 
 	/**

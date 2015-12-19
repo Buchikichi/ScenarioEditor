@@ -19,6 +19,10 @@ import java.util.List;
 import javax.swing.JPanel;
 import javax.swing.Timer;
 
+import org.apache.commons.lang3.StringUtils;
+
+import to.kit.scenario.edit.info.MapAnim;
+import to.kit.scenario.edit.info.MapCell;
 import to.kit.scenario.edit.info.MapEvent;
 import to.kit.scenario.edit.info.MapInfo;
 import to.kit.scenario.edit.info.Square;
@@ -37,7 +41,7 @@ public final class MapPanel extends JPanel implements ActionListener {
 	private BrickChooser brick;
 	private MapInfo mapInfo;
 	private Dimension imgSize;
-	private byte[] mapData;
+	private MapCell[][] mapData;
 	private BufferedImage bgImage;
 	private BufferedImage stairImage;
 	private boolean isShowStair;
@@ -46,7 +50,7 @@ public final class MapPanel extends JPanel implements ActionListener {
 	private int animCount;
 
 	private int calcNumber(final int val) {
-		int num = val & 0x7f;
+		int num = val;
 
 		if (8 * 12 <= num) {
 			int cnt = this.animCount % 4;
@@ -65,18 +69,16 @@ public final class MapPanel extends JPanel implements ActionListener {
 	private void drawImage() {
 		Graphics2D bgg = (Graphics2D) this.bgImage.getGraphics();
 		Graphics2D stg = (Graphics2D) this.stairImage.getGraphics();
-		Square mapSize = this.mapInfo.getMapSize();
+		int y = 0;
 
-		for (int y = 0; y < mapSize.height; y++) {
+		for (MapCell[] line : this.mapData) {
 			int by = y * BrickChooser.BRICK_WIDTH;
-			int origin = y * mapSize.width * 4;
 
-			for (int x = 0; x < mapSize.width; x++) {
-				int bx = x * BrickChooser.BRICK_WIDTH;
-				int ix = origin + x * 4;
-				int bgData = this.mapData[ix] & 0xff;
-				int stairData = this.mapData[ix + 1] & 0xff;
-				byte ev = this.mapData[ix + 2];
+			for (MapCell cell : line) {
+				int bx = cell.getX() * BrickChooser.BRICK_WIDTH;
+				int bgData = cell.getBg();
+				int stairData = cell.getStair();
+				int ev = cell.getEv();
 
 				if (bgData != 0) {
 					Image bgBrick = this.brick.getImage(calcNumber(bgData));
@@ -88,11 +90,11 @@ public final class MapPanel extends JPanel implements ActionListener {
 
 					stg.drawImage(stBrick, bx, by, null);
 				}
-				if (this.isShowWall && 0x7f < bgData) {
-					int num = bgData & 0x7f;
+				if (this.isShowWall && cell.isWall()) {
 					int fy = by + 11;
 					int width = BrickChooser.BRICK_WIDTH - 1;
-					String msg = String.format("%02X", Integer.valueOf(bgData - num));
+					//String msg = String.format("%02X", Integer.valueOf(bgData));
+					String msg = StringUtils.EMPTY;
 					bgg.setColor(Color.BLACK);
 					bgg.drawString(msg, bx, fy + 1);
 					bgg.drawString(msg, bx + 1, fy + 1);
@@ -104,7 +106,7 @@ public final class MapPanel extends JPanel implements ActionListener {
 				}
 				if (this.isShowEvent && ev != 0) {
 					int fy = by + 10;
-					String msg = String.format("%02X", Byte.valueOf(ev));
+					String msg = String.format("%02X", Integer.valueOf(ev));
 					bgg.setColor(Color.BLACK);
 					bgg.drawString(msg, bx, fy + 1);
 					bgg.drawString(msg, bx + 1, fy + 1);
@@ -112,6 +114,7 @@ public final class MapPanel extends JPanel implements ActionListener {
 					bgg.drawString(msg, bx, fy);
 				}
 			}
+			y++;
 		}
 	}
 
@@ -132,11 +135,31 @@ public final class MapPanel extends JPanel implements ActionListener {
 		return (short) ((val & 0xff) << 8 | (val >> 8 & 0xff));
 	}
 
+	private void refillMapData(byte[] mapBytes) {
+		Square mapSize = this.mapInfo.getMapSize();
+
+		this.mapData = new MapCell[mapSize.height][mapSize.width];
+		for (int y = 0; y < mapSize.height; y++) {
+			int origin = y * mapSize.width * 4;
+
+			for (int x = 0; x < mapSize.width; x++) {
+				int ix = origin + x * 4;
+				int bgData = mapBytes[ix] & 0xff;
+				int stairData = mapBytes[ix + 1] & 0xff;
+				int ev = mapBytes[ix + 2];
+
+				this.mapData[y][x] = new MapCell(x, y, bgData, stairData, ev);
+			}
+		}
+	}
+
 	/**
 	 * @param file
 	 * @throws IOException
 	 */
 	public void load(File file) throws IOException {
+		byte[] mapBytes;
+
 		try (InputStream in = new FileInputStream(file);
 				DataInputStream data = new DataInputStream(in)) {
 			byte[] b = new byte[4];
@@ -165,10 +188,11 @@ public final class MapPanel extends JPanel implements ActionListener {
 			}
 			this.imgSize = new Dimension(width * BrickChooser.BRICK_WIDTH, height * BrickChooser.BRICK_WIDTH);
 			setPreferredSize(this.imgSize);
-			this.mapData = new byte[width * height * 4];
-			data.read(this.mapData);
+			mapBytes = new byte[width * height * 4];
+			data.read(mapBytes);
 			//System.out.println("available:" + data.available());
 		}
+		refillMapData(mapBytes);
 		this.actor.setVisible(true);
 		this.timer.start();
 		// ここで描かないとsave出来ない
@@ -212,20 +236,33 @@ public final class MapPanel extends JPanel implements ActionListener {
 		Square mapSize = this.mapInfo.getMapSize();
 		int[][] wall = new int[mapSize.height][mapSize.width];
 		List<MapEvent> eventList = this.mapInfo.getEventList();
+		List<MapAnim> animList = this.mapInfo.getAnimList();
 
-		for (int y = 0; y < mapSize.height; y++) {
-			int origin = y * mapSize.width * 4;
+		for (MapCell[] line : this.mapData) {
+			for (MapCell cell : line) {
+				int x = cell.getX();
+				int y = cell.getY();
+				int bgData = cell.getBg();
+				int bgType = cell.getBgType();
+				int stair = cell.getStair();
+				int stairType = cell.getStairType();
+				int ev = cell.getEv();
 
-			for (int x = 0; x < mapSize.width; x++) {
-				int ix = origin + x * 4;
-				int bgData = this.mapData[ix] & 0xff;
-				byte ev = this.mapData[ix + 2];
-
-				wall[y][x] = bgData < 0x80 ? 0 : 1;
+				wall[y][x] = cell.isWall() ? 1 : 0;
 				if (0 < ev) {
 					String position = x + "-" + y;
-					MapEvent event = new MapEvent(position, ev);
-					eventList.add(event);
+
+					eventList.add(new MapEvent(position, ev));
+				}
+				if (0 < bgType) {
+					int ox = bgData % 8;
+					int oy = bgData / 8;
+					animList.add(new MapAnim(x, y, ox, oy, 0, bgType));
+				}
+				if (0 < stairType) {
+					int ox = stair % 8;
+					int oy = stair / 8;
+					animList.add(new MapAnim(x, y, ox, oy, 1, stairType));
 				}
 			}
 		}
